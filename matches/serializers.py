@@ -61,7 +61,7 @@ class MatchCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Match
         fields = [
-            'date', 'time_start', 'time_end', 'district',
+            'id', 'date', 'time_start', 'time_end', 'district',
             'notes', 'max_players', 'skill_level_required',
         ]
 
@@ -76,11 +76,6 @@ class MatchCreateSerializer(serializers.ModelSerializer):
         if len(value) > 100:
             raise serializers.ValidationError('备注不能超过100字')
         return value
-
-    def create(self, validated_data):
-        validated_data['creator'] = self.context['request'].user
-        return super().create(validated_data)
-
 
 class MatchApplicationSerializer(serializers.ModelSerializer):
     """报名序列化器"""
