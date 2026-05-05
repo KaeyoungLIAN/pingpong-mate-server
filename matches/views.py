@@ -35,15 +35,35 @@ class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all().order_by('date', 'time_start')
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+
+        if params.get('date'):
+            qs = qs.filter(date=params['date'])
+        if params.get('district'):
+            qs = qs.filter(district=params['district'])
+        if params.get('skill_level_required'):
+            qs = qs.filter(skill_level_required__lte=params['skill_level_required'])
+
+        return qs
+
     def get_serializer_class(self):
         if self.action == 'create':
             return MatchCreateSerializer
         if self.action == 'retrieve':
             return MatchDetailSerializer
+        if self.action in ['update', 'partial_update']:
+            return MatchCreateSerializer
         return MatchListSerializer
 
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
+
+    def perform_destroy(self, instance):
+        """取消约球：不删除，改为 cancelled 状态"""
+        instance.status = Match.Status.CANCELLED
+        instance.save(update_fields=['status'])
 
 
 class MatchApplyView(APIView):
