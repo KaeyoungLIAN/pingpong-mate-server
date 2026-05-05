@@ -8,4 +8,6 @@ urlpatterns = [
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
     # 查看其他用户
     path('<int:user_id>/', views.UserDetailView.as_view(), name='user-detail'),
+    # 退出登录（需认证）
+    path('logout/', views.LogoutView.as_view(), name='user-logout'),
 ]

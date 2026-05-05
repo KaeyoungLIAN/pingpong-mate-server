@@ -33,18 +33,10 @@ class WeChatLoginView(APIView):
 
         code = serializer.validated_data['code']
 
-        # Mock 微信登录：code 映射固定 openid
-        mock_openid_map = {
-            'test': 'mock_openid_001',
-            'test2': 'mock_openid_002',
-            'test3': 'mock_openid_003',
-        }
-        openid = mock_openid_map.get(code)
-        if not openid:
-            return Response(
-                {'error': '无效的登录凭证'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Mock 微信登录：开发环境接受任意 code
+        # 真实环境替换为: requests.get('https://api.weixin.qq.com/sns/jscode2session', params={...})
+        import hashlib
+        openid = 'mock_' + hashlib.md5(code.encode()).hexdigest()[:12]
 
         # 查询或创建用户
         user, created = User.objects.get_or_create(
@@ -94,3 +86,19 @@ class UserDetailView(RetrieveAPIView):
     queryset = User.objects.all()
     lookup_field = 'id'
     lookup_url_kwarg = 'user_id'
+
+
+# ---------------------------------------------------------------------------
+# 退出登录
+# ---------------------------------------------------------------------------
+class LogoutView(APIView):
+    """
+    退出登录，删除当前用户的 Token
+    POST /api/users/logout/
+    """
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        request.user.auth_token.delete()
+        return Response({'message': '已退出登录'}, status=status.HTTP_200_OK)
