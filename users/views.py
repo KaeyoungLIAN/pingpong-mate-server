@@ -20,29 +20,89 @@ from .serializers import (
 # ---------------------------------------------------------------------------
 class WeChatLoginView(APIView):
     """
-    微信登录接口
+    登录接口
     POST /api/users/login/
-    接收 {code}，mock 微信登录，返回 token 和用户信息
+    支持两种模式：
+    - { "code": "xxx" }  → 微信登录 mock（已有逻辑）
+    - { "user_id": "A" } → Demo 选择用户登录
     """
-    authentication_classes = []       # 登录接口不要求认证
+    authentication_classes = []
     permission_classes = [AllowAny]
+
+    # Demo 用户预设资料
+    DEMO_USERS = {
+        'A': {
+            'nickname': '小张',
+            'gender': 'male',
+            'age': 28,
+            'skill_level': 3,
+            'district': '朝阳区',
+            'paddle_type': '横板',
+            'rubber_type': '反胶',
+            'bio': '周末约球，欢迎来朝阳',
+        },
+        'B': {
+            'nickname': '小李',
+            'gender': 'male',
+            'age': 22,
+            'skill_level': 1,
+            'district': '海淀区',
+            'paddle_type': '直板',
+            'rubber_type': '正胶',
+            'bio': '刚学乒乓球，求带',
+        },
+        'C': {
+            'nickname': '小王',
+            'gender': 'female',
+            'age': 35,
+            'skill_level': 5,
+            'district': '东城区',
+            'paddle_type': '横板',
+            'rubber_type': '反胶',
+            'bio': '专业退役，欢迎切磋',
+        },
+    }
 
     def post(self, request):
         serializer = WeChatLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        code = serializer.validated_data['code']
+        data = serializer.validated_data
 
-        # Mock 微信登录：开发环境接受任意 code
-        # 真实环境替换为: requests.get('https://api.weixin.qq.com/sns/jscode2session', params={...})
-        import hashlib
-        openid = 'mock_' + hashlib.md5(code.encode()).hexdigest()[:12]
+        # 模式1：Demo 用户选择登录
+        if data.get('user_id'):
+            user_id = data['user_id'].upper()
+            if user_id not in self.DEMO_USERS:
+                return Response(
+                    {'message': f'无效的用户标识: {user_id}，可选 A/B/C'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            preset = self.DEMO_USERS[user_id]
+            openid = f'demo_{user_id}'
+            user, created = User.objects.get_or_create(
+                wechat_openid=openid,
+                defaults={
+                    'nickname': preset['nickname'],
+                    'gender': preset['gender'],
+                    'age': preset['age'],
+                    'skill_level': preset['skill_level'],
+                    'district': preset['district'],
+                    'paddle_type': preset['paddle_type'],
+                    'rubber_type': preset['rubber_type'],
+                    'bio': preset['bio'],
+                    'is_profile_complete': True,
+                },
+            )
 
-        # 查询或创建用户
-        user, created = User.objects.get_or_create(
-            wechat_openid=openid,
-            defaults={'nickname': f'球友_{openid[-4:]}'}
-        )
+        # 模式2：微信登录 mock（已有逻辑）
+        else:
+            code = data['code']
+            import hashlib
+            openid = 'mock_' + hashlib.md5(code.encode()).hexdigest()[:12]
+            user, created = User.objects.get_or_create(
+                wechat_openid=openid,
+                defaults={'nickname': f'球友_{openid[-4:]}'}
+            )
 
         # 获取或创建 DRF Token
         token, _ = Token.objects.get_or_create(user=user)
@@ -95,10 +155,17 @@ class LogoutView(APIView):
     """
     退出登录，删除当前用户的 Token
     POST /api/users/logout/
+    DELETE /api/users/logout/
     """
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        return self._logout(request)
+
+    def delete(self, request):
+        return self._logout(request)
+
+    def _logout(self, request):
         request.user.auth_token.delete()
         return Response({'message': '已退出登录'}, status=status.HTTP_200_OK)

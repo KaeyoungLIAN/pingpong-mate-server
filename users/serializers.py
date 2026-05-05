@@ -3,13 +3,14 @@ from .models import User
 
 
 class WeChatLoginSerializer(serializers.Serializer):
-    """微信登录序列化器：接收前端传来的 code"""
-    code = serializers.CharField(help_text='微信登录凭证 code')
+    """登录序列化器：接收 code（微信登录）或 user_id（Demo 选择登录）"""
+    code = serializers.CharField(required=False, help_text='微信登录凭证 code')
+    user_id = serializers.CharField(required=False, help_text='Demo 用户标识，如 A/B/C')
 
-    def validate_code(self, value):
-        if not value or value.strip() == '':
-            raise serializers.ValidationError('code 不能为空')
-        return value.strip()
+    def validate(self, attrs):
+        if not attrs.get('code') and not attrs.get('user_id'):
+            raise serializers.ValidationError('必须提供 code 或 user_id')
+        return attrs
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
